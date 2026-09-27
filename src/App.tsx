@@ -1,29 +1,237 @@
-import { useRef, useState } from 'react';
-import { Activity, ArrowUpRight, ChevronRight, Crosshair, Download, LayoutDashboard, RotateCcw, Shield, Sparkles, Swords, Upload, X, Zap } from 'lucide-react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { analyze, average, demoMatches, downloadExample, kd, parseCSV, sum, winRate, type Match } from './data';
-const tooltip={background:'#202526',border:'1px solid #39403d',borderRadius:8,color:'#f1f2eb',fontSize:12};
-export default function App(){
- const [matches,setMatches]=useState<Match[]>(demoMatches),[source,setSource]=useState('demo'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[view,setView]=useState('overview'),[filter,setFilter]=useState('All'),[page,setPage]=useState(0);
- const file=useRef<HTMLInputElement>(null); const a=analyze(matches),fk=sum(matches,'firstKills'),fd=sum(matches,'firstDeaths'),duel=fk+fd?fk/(fk+fd)*100:0;
- const recent=[...matches].reverse().filter(m=>filter==='All'||m.result===filter),pages=Math.ceil(recent.length/8),displayed=recent.slice(page*8,page*8+8);
- const trend=matches.slice(-12).map((m,i)=>({name:String(i+1).padStart(2,'0'),acs:m.acs,map:m.map,date:m.date}));
- async function upload(f?:File){if(!f)return;setError('');setNotice('');try{if(f.size>5*1024*1024)throw new Error('Please select a CSV smaller than 5 MB.');const data=parseCSV(await f.text());setMatches(data);setSource(f.name);setPage(0);setFilter('All');setNotice(`Imported ${data.length} matches. Your analytics are ready.`);}catch(e){setError(e instanceof Error?e.message:'Could not read this CSV.');}finally{if(file.current)file.current.value='';}}
- return <div className="app-shell"><aside className="sidebar"><a className="brand" href="#" aria-label="RoundLens home"><span className="logo"><Crosshair size={23}/></span>RoundLens<span className="brand-dot">.</span></a><div className="side-label">WORKSPACE</div><button className={`nav-item ${view==='overview'?'active':''}`} onClick={()=>setView('overview')}><LayoutDashboard size={17}/> Overview</button><button className={`nav-item ${view==='matches'?'active':''}`} onClick={()=>setView('matches')}><Swords size={17}/> Match history <span className="nav-count">{matches.length}</span></button><div className="sidebar-note"><Crosshair size={24}/><h3>Go beyond the scoreboard.</h3><p>Find the patterns.<br/>Make the next round count.</p><span>YOUR GAME. IN FOCUS.</span></div><div className="side-bottom"><span className="avatar">A</span><div><strong>Ajay</strong><small>Demo player</small></div><span className="online-dot"/></div></aside>
- <div className="main-shell"><header className="topbar"><span className="breadcrumb">Workspace <ChevronRight size={13}/> <strong>{view==='overview'?'Overview':'Match history'}</strong></span><span className="local-tag"><span className="online-dot"/> LOCAL ANALYTICS</span></header><main>
- <div className="page-heading"><div><div className="eyebrow">LESS GUESSWORK. BETTER ROUNDS.</div><h1>{view==='overview'?'Your game, in focus.':'Every match tells a story.'}</h1><p>Understand the rounds behind the rank.</p></div><div className="header-actions"><button className="button secondary" onClick={()=>{setMatches(demoMatches);setSource('demo');setError('');setNotice('Demo data loaded. All 20 matches are ready.');setFilter('All');setPage(0);}}><RotateCcw size={15}/> Load Demo Data</button><button className="button primary" onClick={()=>file.current?.click()}><Upload size={15}/> Upload CSV</button><input ref={file} type="file" accept=".csv,text/csv" className="sr-only" aria-label="Upload match CSV" onChange={e=>upload(e.target.files?.[0])}/></div></div>
- <div className="demo-banner"><span><span className="online-dot"/>{source==='demo'?'Demo dataset — RoundLens v0.1':`Uploaded dataset — ${source}`}<span className="banner-description">{source==='demo'?'Fictional matches. Real insights.':'Processed entirely in your browser.'}</span></span><button onClick={downloadExample}><Download size={13}/> Download example CSV</button></div>
- {error&&<div role="alert" className="alert error"><span><strong>Couldn’t import CSV.</strong> {error}</span><button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}{notice&&<div role="status" className="alert success">{notice}<button aria-label="Dismiss notification" onClick={()=>setNotice('')}><X size={16}/></button></div>}
- <section className="player-heading"><div className="player-id"><span className="player-avatar">A</span><div><h2>Ajay <span className="player-label">PLAYER REPORT</span></h2><p>{matches.length} matches · {matches[0].date} – {matches[matches.length-1].date}</p></div></div><div className="rank"><Shield size={25}/><div><small>{source==='demo'?'CURRENT RANK':'DEMO PLAYER RANK'}</small><strong>Immortal 1</strong></div></div></section>
- <section className="stats-grid"><Stat label="WIN RATE" value={`${winRate(matches).toFixed(0)}%`} note={`${matches.filter(m=>m.result==='Win').length} wins / ${matches.filter(m=>m.result==='Loss').length} losses`} accent/><Stat label="KILL / DEATH" value={kd(matches)} note={`${sum(matches,'kills')} kills · ${sum(matches,'deaths')} deaths`}/><Stat label="AVERAGE ACS" value={a.acs.toFixed(0)} note="Average combat score"/><Stat label="MATCHES ANALYZED" value={String(matches.length).padStart(2,'0')} note={`${average(matches,'headshotPercentage').toFixed(1)}% avg. headshot rate`}/></section>
- {view==='overview'&&<><section className="insights-panel"><div className="section-heading"><h2><Sparkles size={18}/> What RoundLens noticed</h2><span className="badge">THE WHY BEHIND THE NUMBERS</span></div><div className="insights-grid">{a.insights.map((item,i)=><article key={item.title}><span className="insight-number">0{i+1}</span><h3>{item.title}</h3><p>{item.text}</p></article>)}</div><div className="insight-footnote">Patterns from your match data, not predictions. Small samples can shift quickly.</div></section>
- <div className="duel-row"><section className="panel"><div className="section-heading"><h2><Crosshair size={18}/> First duel impact</h2><span className="muted">SET THE TONE</span></div><div className="duel-content"><div className="duel-main"><div className={`duel-value ${duel>=50?'positive':'negative'}`}>{fk+fd?duel.toFixed(1):'—'}<span>{fk+fd?'%':''}</span><span className="duel-arrow">{fk+fd?(duel>=50?'?':'?'):''}</span></div><p>Opening duel win rate</p><div className="duel-counts"><span><b className="positive">{fk}</b> First kills</span><span><b className="negative">{fd}</b> First deaths</span></div></div><div className="duel-compare"><Comparison label="More first kills than deaths" value={winRate(a.positive)} count={a.positive.length} positive/><Comparison label="Equal or more first deaths" value={winRate(a.negative)} count={a.negative.length}/><p className="comparison-note">Match win rate by opening-duel balance</p></div></div></section>
- <section className="panel"><div className="section-heading"><h2><Activity size={18}/> Consistency score</h2></div><div className="consistency-content"><div className="score-ring" style={{background:`conic-gradient(var(--lime) ${(matches.length>1?a.consistency:0)*3.6}deg, #2b3030 0)`}}><div><strong>{matches.length>1?a.consistency:'—'}</strong><span>/ 100</span></div></div><div><span className="score-label">{matches.length<2?'NEEDS MORE DATA':a.consistency>=75?'STEADY OUTPUT':a.consistency>=50?'ROOM TO STABILIZE':'HIGH VARIATION'}</span><p>{matches.length<2?'At least two matches are needed.':'Less ACS variation means a higher score. Every game counts.'}</p></div></div><p className="formula">100 - (ACS standard deviation ÷ average ACS × 150), floored at 0.</p></section></div>
- <div className="charts-row"><section className="panel"><div className="section-heading"><h2>Map performance</h2><span className="chart-legend"><i/> Win rate</span></div><div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><BarChart data={a.maps} margin={{top:14,right:8,left:-25,bottom:0}}><CartesianGrid stroke="#2a2f30" vertical={false} strokeDasharray="3 5"/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill:'#a6acab',fontSize:11}} dy={8}/><YAxis domain={[0,100]} ticks={[0,25,50,75,100]} axisLine={false} tickLine={false} tick={{fill:'#757e7b',fontSize:10}} tickFormatter={v=>`${v}%`}/><Tooltip contentStyle={tooltip} cursor={{fill:'#ffffff05'}} formatter={v=>[`${Number(v).toFixed(0)}%`,'Win rate']}/><Bar dataKey="winRate" maxBarSize={44} radius={[3,3,0,0]}>{a.maps.map(m=><Cell key={m.name} fill={m.winRate>=50?'#c3e887':'#596963'}/>)}</Bar></BarChart></ResponsiveContainer></div><div className="map-acs">{a.maps.map(m=><div key={m.name}><span>{m.name}</span><strong>{m.acs.toFixed(0)} <small>ACS</small></strong></div>)}</div></section>
- <section className="panel"><div className="section-heading"><h2>Recent performance</h2><span className="muted">LAST {trend.length} MATCHES</span></div><div className="trend-summary"><strong>{average(matches.slice(-12),'acs').toFixed(0)}</strong><span>average ACS <i className="legend-line"/></span></div><div className="chart-wrap trend"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trend} margin={{top:10,right:12,left:-25,bottom:0}}><defs><linearGradient id="acsFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#c3e887" stopOpacity={0.15}/><stop offset="100%" stopColor="#c3e887" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#2a2f30" vertical={false} strokeDasharray="3 5"/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill:'#757e7b',fontSize:10}}/><YAxis axisLine={false} tickLine={false} tick={{fill:'#757e7b',fontSize:10}}/><Tooltip contentStyle={tooltip} labelFormatter={(_,payload)=>payload?.[0]?`${payload[0].payload.map} · ${payload[0].payload.date}`:''}/><Area type="linear" dataKey="acs" name="ACS" stroke="#c3e887" strokeWidth={2} fill="url(#acsFill)" dot={{r:3,fill:'#15191a',strokeWidth:2}} activeDot={{r:5}}/></AreaChart></ResponsiveContainer></div><div className="chart-bottom"><span>OLDER MATCHES</span><span>MOST RECENT ?</span></div></section></div>
- <section className="agent-section"><div className="section-heading"><h2>Find your edge</h2><span className="muted">AGENT PERFORMANCE</span></div><div className="agent-grid">{a.agents.map((agent,i)=><article className={`agent-card agent-${agent.name.toLowerCase()}`} key={agent.name}><div className="agent-top"><span className="agent-emblem">{agent.name==='Neon'?<Zap/>:agent.name==='Jett'?<Activity/>:<Crosshair/>}</span><div><h3>{agent.name}</h3><span>{agent.matches} MATCHES</span></div>{agent.acs===Math.max(...a.agents.map(v=>v.acs))&&<span className="best-tag">TOP ACS</span>}<span className="agent-index">0{i+1}</span></div><div className="agent-stats"><div><small>WIN RATE</small><strong className={agent.winRate>=50?'positive':''}>{agent.winRate.toFixed(0)}%</strong></div><div><small>K/D</small><strong>{agent.kd}</strong></div><div><small>AVG ACS</small><strong>{agent.acs.toFixed(0)}</strong></div></div></article>)}</div></section></>}
- <section className="panel matches-panel"><div className="section-heading"><h2>Recent matches <span className="count-badge">{matches.length}</span></h2><div className="filter-tabs" aria-label="Filter matches">{['All','Win','Loss'].map(f=><button key={f} aria-pressed={filter===f} className={filter===f?'selected':''} onClick={()=>{setFilter(f);setPage(0);}}>{f==='All'?'All matches':f==='Win'?'Wins':'Losses'}</button>)}</div></div><div className="table-scroll"><table><thead><tr>{['Map','Agent','Score','K / D / A','ACS','First kills','First deaths','Result'].map(t=><th key={t}>{t}</th>)}</tr></thead><tbody>{displayed.map((m,i)=><tr key={`${m.date}-${i}`}><td><div className="map-cell"><span className={`map-tile map-${m.map.toLowerCase()}`}><span>{m.map.slice(0,1)}</span></span><div><strong>{m.map}</strong><small>{m.date}</small></div></div></td><td>{m.agent}</td><td className="score-cell"><span className={m.result==='Win'?'positive':''}>{m.roundsWon}</span><span className="score-divider">:</span>{m.roundsLost}</td><td>{m.kills} <span className="muted">/ {m.deaths} /</span> {m.assists}</td><td className="acs-cell">{m.acs}</td><td className="positive">{m.firstKills}</td><td className="negative">{m.firstDeaths}</td><td><span className={`result ${m.result.toLowerCase()}`}>{m.result==='Win'?'VICTORY':'DEFEAT'}</span></td></tr>)}</tbody></table>{!recent.length&&<p className="empty">No matches in this filter.</p>}</div><div className="table-footer"><span>{recent.length?`${page*8+1}–${Math.min((page+1)*8,recent.length)}`:'0'} of {recent.length} matches</span><div><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Previous</button><button disabled={page+1>=pages} onClick={()=>setPage(p=>p+1)}>Next <ChevronRight size={12}/></button></div></div></section>
- <footer><span className="footer-brand"><Crosshair size={16}/> RoundLens <small>v0.1</small></span><p>Built as an early prototype to explore whether match data can reveal actionable patterns beyond traditional VALORANT statistics.</p><span className="footer-note">Independent project. Not affiliated with Riot Games.</span></footer></main></div></div>;
+import { useMemo, useRef, useState } from "react";
+import { Crosshair, Download, RotateCcw, Upload, X } from "lucide-react";
+import RoundImpact from "./components/RoundImpact";
+import PerformanceTrend from "./components/PerformanceTrend";
+import PerformanceSplits from "./components/PerformanceSplits";
+import MatchHistory from "./components/MatchHistory";
+import { Stat } from "./components/primitives";
+import {
+  analyze,
+  demoMatches,
+  downloadExample,
+  parseCSV,
+  type Match,
+  signed,
+} from "./data";
+
+export default function App() {
+  const [matches, setMatches] = useState<Match[]>(demoMatches);
+  const [source, setSource] = useState("demo");
+  const [error, setError] = useState("");
+  const [datasetVersion, setDatasetVersion] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState("");
+  const file = useRef<HTMLInputElement>(null);
+  const a = useMemo(() => analyze(matches), [matches]);
+  const fk = a.firstKills,
+    fd = a.firstDeaths;
+  const sd = a.sd;
+  const agents = a.agents;
+  const mapVariation = a.mapVariation;
+  const hasComparison = a.positive.length > 0 && a.negative.length > 0;
+  const duelNote = hasComparison
+    ? `${signed(a.gap)} pp win rate with positive opening differential`
+    : "Opening comparison needs both match groups";
+
+  function loadDemo() {
+    setDatasetVersion((v) => v + 1);
+    setMatches(demoMatches);
+    setSource("demo");
+    setError("");
+    setNotice("Loaded 20 demo matches.");
+  }
+  async function upload(f?: File) {
+    if (!f) return;
+    setError("");
+    setNotice("");
+    setLoading(true);
+    try {
+      if (f.size > 5 * 1024 * 1024)
+        throw new Error("Please select a CSV smaller than 5 MB.");
+      const data = parseCSV(await f.text());
+      setDatasetVersion((v) => v + 1);
+      setMatches(data);
+      setSource(f.name);
+      setNotice(`Imported ${data.length} matches.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read this CSV.");
+    } finally {
+      setLoading(false);
+      if (file.current) file.current.value = "";
+    }
+  }
+
+  return (
+    <div className="telemetry">
+      <header className="app-bar">
+        <a href="#" className="wordmark">
+          <Crosshair size={18} strokeWidth={1.5} /> ROUNDLENS{" "}
+          <span> / 0.1</span>
+        </a>
+        <span className="app-context">VALORANT / MATCH ANALYSIS</span>
+        <div className="controls">
+          <button disabled={loading} onClick={loadDemo}>
+            <RotateCcw size={12} /> Load Demo Data
+          </button>
+          <button
+            disabled={loading}
+            className="import-button"
+            onClick={() => file.current?.click()}
+          >
+            <Upload size={12} /> {loading ? "Importingâ€¦" : "Upload CSV"}
+          </button>
+          <input
+            ref={file}
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            aria-label="Upload match CSV"
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
+        </div>
+      </header>
+      <main>
+        <section className="player-strip" aria-label="Player profile">
+          <div className="identity">
+            <h1>Ajay</h1>
+            <span className="rank-mark">I</span>
+            <strong>Immortal 1</strong>
+            {source !== "demo" && <small>demo profile rank</small>}
+          </div>
+          <div className="sample-meta">
+            <span>
+              <b>{matches.length}</b> matches analyzed
+            </span>
+            <span className="mono">
+              {matches[0]?.date ?? "â€”"} â€”{" "}
+              {matches[matches.length - 1]?.date ?? "â€”"}
+            </span>
+            <span className="queue">COMPETITIVE</span>
+          </div>
+        </section>
+        <div className="dataset-strip">
+          <span>
+            {source === "demo"
+              ? "Demo dataset â€” RoundLens v0.1"
+              : `CSV / ${source}`}
+          </span>
+          <button onClick={downloadExample}>
+            <Download size={11} /> Download example CSV
+          </button>
+        </div>
+        {error && (
+          <div role="alert" className="message error">
+            <span>
+              <strong>Import failed.</strong> {error}
+            </span>
+            <button aria-label="Dismiss error" onClick={() => setError("")}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {notice && (
+          <div role="status" className="message">
+            <span>{notice}</span>
+            <button
+              aria-label="Dismiss notification"
+              onClick={() => setNotice("")}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        <section className="stat-strip" aria-label="Core statistics">
+          <Stat
+            label="WIN RATE"
+            value={`${a.winRate.toFixed(0)}%`}
+            note={`${a.wins}W / ${a.losses}L`}
+          />
+          <Stat
+            label="K/D"
+            value={a.kd}
+            note={`${a.kills} kills / ${a.deaths} deaths`}
+          />
+          <Stat
+            label="AVG ACS"
+            value={a.acs.toFixed(0)}
+            note={`${a.headshotPercentage.toFixed(1)}% avg. match HS`}
+          />
+          <Stat
+            label="FIRST DUEL WIN RATE"
+            value={
+              a.firstDuelWinRate !== null
+                ? `${a.firstDuelWinRate.toFixed(1)}%`
+                : "â€”"
+            }
+            note={`${fk} FK / ${fd} FD`}
+            accent={fk > fd}
+          />
+          <Stat
+            label="CONSISTENCY"
+            value={matches.length > 1 ? `${a.consistency}` : "â€”"}
+            suffix={matches.length > 1 ? "/100" : ""}
+            note={
+              matches.length > 1
+                ? `ACS deviation Â±${sd.toFixed(1)}`
+                : "Requires 2+ matches"
+            }
+          />
+        </section>
+        <div className="signal-strip">
+          <span className="signal-label">OBSERVED</span>
+          <span>{duelNote}</span>
+          <span>
+            Highest ACS on <b>{agents[0]?.name ?? "â€”"}</b>
+          </span>
+          <span>
+            {mapVariation.length >= 2 ? (
+              <>
+                Most inconsistent on <b>{mapVariation[0].name}</b>{" "}
+                <small>(ACS SD)</small>
+              </>
+            ) : (
+              "Map variation needs 2 maps with 2+ matches"
+            )}
+          </span>
+        </div>
+
+        <div className="analysis-grid">
+          <RoundImpact a={a} />
+          <PerformanceTrend matches={matches} a={a} />
+        </div>
+
+        <PerformanceSplits a={a} />
+
+        <MatchHistory key={datasetVersion} matches={matches} />
+        <section className="review-notes">
+          <h2>
+            What RoundLens noticed <span>/ REVIEW NOTES</span>
+          </h2>
+          <div>
+            {!a.insights.length && (
+              <p>Add more matches to compare performance patterns.</p>
+            )}
+            {a.insights.map((insight, i) => (
+              <p key={insight.title}>
+                <span>0{i + 1}</span>
+                {insight.text}
+              </p>
+            ))}
+          </div>
+        </section>
+        <footer>
+          <span>ROUNDLENS / 0.1</span>
+          <p>
+            Built as an early prototype to explore whether match data can reveal
+            actionable patterns beyond traditional VALORANT statistics.
+          </p>
+          <small>
+            Current prototype uses local match data. Live Riot API integration
+            is planned after authentication and production API requirements are
+            implemented. Not affiliated with Riot Games.
+          </small>
+        </footer>
+      </main>
+    </div>
+  );
 }
-function Stat({label,value,note,accent=false}:{label:string;value:string;note:string;accent?:boolean}){return <article className="stat-card"><span>{label}</span><strong className={accent?'positive':''}>{value}{accent&&<ArrowUpRight size={22}/>}</strong><small>{note}</small></article>}
-function Comparison({label,value,count,positive=false}:{label:string;value:number;count:number;positive?:boolean}){return <div className="comparison"><div><span>{label}</span><strong>{count?`${value.toFixed(0)}%`:'—'}</strong></div><div className="bar-track"><div style={{width:`${value}%`,background:positive?'var(--lime)':'var(--red)'}}/></div><small>{count} matches</small></div>}
